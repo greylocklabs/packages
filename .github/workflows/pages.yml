@@ -1,0 +1,107 @@
+name: pages
+
+# Rebuilds the repository from the apps' releases and publishes it at
+# packages.greylocklabs.org. The hourly run publishes only when a release has
+# come or gone since the last one.
+on:
+  schedule:
+    - cron: "17 * * * *"
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: ["scripts/**", "site/**", ".github/workflows/pages.yml"]
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+env:
+  APPS: callie jot
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    container: debian:trixie
+    outputs:
+      changed: ${{ steps.releases.outputs.changed }}
+    steps:
+      - name: Install tools
+        run: |
+          apt-get update -qq
+          DEBIAN_FRONTEND=noninteractive apt-get install -y -qq --no-install-recommends \
+            ca-certificates curl git gh gnupg rpm createrepo-c apt-utils >/dev/null
+
+      - uses: actions/checkout@v5
+
+      - name: Compare the releases with the published ones
+        id: releases
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          for app in $APPS; do
+            gh release list --repo "greylocklabs/$app" --limit 10 --exclude-drafts \
+              --exclude-pre-releases --json tagName -q ".[].tagName | \"$app \" + ."
+          done >releases.txt
+          curl -fsSL https://packages.greylocklabs.org/releases.txt -o published.txt || : >published.txt
+          if [ "$GITHUB_EVENT_NAME" = schedule ] && cmp -s releases.txt published.txt; then
+            echo "changed=false" >>"$GITHUB_OUTPUT"
+          else
+            echo "changed=true" >>"$GITHUB_OUTPUT"
+          fi
+
+      - name: Import the signing key
+        if: steps.releases.outputs.changed == 'true'
+        env:
+          SIGNING_KEY: ${{ secrets.GREYLOCK_REPO_SIGNING_KEY }}
+          SIGNING_PASSPHRASE: ${{ secrets.GREYLOCK_REPO_SIGNING_PASSPHRASE }}
+        run: |
+          GNUPGHOME="$(mktemp -d)"
+          echo "GNUPGHOME=$GNUPGHOME" >>"$GITHUB_ENV"
+          export GNUPGHOME
+          # The passphrase goes to this runner's agent up front, so signing never asks.
+          echo allow-preset-passphrase >"$GNUPGHOME/gpg-agent.conf"
+          printf '%s\n' "$SIGNING_KEY" | gpg --batch --quiet --import
+          for keygrip in $(gpg --list-secret-keys --with-keygrip --with-colons |
+              awk -F: '/^grp/ { print $10 }'); do
+            printf '%s' "$SIGNING_PASSPHRASE" |
+              "$(gpgconf --list-dirs libexecdir)/gpg-preset-passphrase" --preset "$keygrip"
+          done
+          fingerprint="$(gpg --list-secret-keys --with-colons | awk -F: '/^fpr/ { print $10; exit }')"
+          if ! echo check | gpg --batch --pinentry-mode error --local-user "$fingerprint" \
+              --clearsign >/dev/null; then
+            echo "::error::Could not sign with GREYLOCK_REPO_SIGNING_KEY; GREYLOCK_REPO_SIGNING_PASSPHRASE may be wrong, see gpg's error above."
+            exit 1
+          fi
+          echo "FINGERPRINT=$fingerprint" >>"$GITHUB_ENV"
+
+      - name: Build the repository
+        if: steps.releases.outputs.changed == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # shellcheck disable=SC2086 # APPS is a list of names
+          scripts/fetch-packages.sh packages $APPS
+          scripts/build-repo.sh packages out "$FINGERPRINT"
+          cp -r site/. out/
+          cp releases.txt out/
+
+      - if: steps.releases.outputs.changed == 'true'
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: out
+
+  deploy:
+    needs: build
+    if: needs.build.outputs.changed == 'true'
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - id: deploy
+        uses: actions/deploy-pages@v4

@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Greylock Labs packages</title>
+<meta name="description" content="The signed dnf and apt repository for Greylock Labs apps on Linux.">
+<style>
+  :root { color-scheme: light dark; --fg: #2b2027; --bg: #fdf7fa; --accent: #a64b7a; --code: #f3e6ee; }
+  @media (prefers-color-scheme: dark) { :root { --fg: #f3e6ee; --bg: #1d161b; --accent: #e08ab4; --code: #2c2129; } }
+  body { margin: 0 auto; max-width: 46rem; padding: 2rem 1rem 4rem; background: var(--bg); color: var(--fg);
+         font: 17px/1.55 system-ui, sans-serif; }
+  h1, h2 { line-height: 1.2; } a { color: var(--accent); }
+  pre { background: var(--code); padding: .8rem 1rem; border-radius: .6rem; overflow-x: auto; }
+  code { font-size: .92em; }
+</style>
+</head>
+<body>
+<h1>Greylock Labs packages</h1>
+<p>
+  The signed dnf and apt repository for <a href="https://greylocklabs.org">Greylock Labs</a> apps on
+  Linux: <a href="https://callieapp.org">Callie</a> and <a href="https://jotwriter.org">Jot</a>.
+  Each app's installer adds it for you, so updates come with the system's. To add it by hand:
+</p>
+
+<h2>Fedora</h2>
+<pre><code>sudo curl -fsSL -o /etc/yum.repos.d/greylocklabs.repo https://packages.greylocklabs.org/rpm/greylocklabs.repo
+sudo dnf install callie jot</code></pre>
+
+<h2>Debian</h2>
+<pre><code>sudo curl -fsSL -o /usr/share/keyrings/greylocklabs.asc https://packages.greylocklabs.org/greylocklabs.asc
+sudo curl -fsSL -o /etc/apt/sources.list.d/greylocklabs.sources https://packages.greylocklabs.org/deb/greylocklabs.sources
+sudo apt update &amp;&amp; sudo apt install callie jot</code></pre>
+
+<h2>Ubuntu</h2>
+<pre><code>sudo curl -fsSL -o /usr/share/keyrings/greylocklabs.asc https://packages.greylocklabs.org/greylocklabs.asc
+sudo curl -fsSL -o /etc/apt/sources.list.d/greylocklabs.sources https://packages.greylocklabs.org/deb/greylocklabs-ubuntu.sources
+sudo apt update &amp;&amp; sudo apt install callie</code></pre>
+
+<p>
+  The key's fingerprint is <code>0936 1156 3109 8684 5012 EA9E 3E6A 2C1F AFEE ECEC</code>. Packages
+  are built by each app's release workflow on GitHub, and the repository is rebuilt from those
+  releases by <a href="https://github.com/greylocklabs/packages">greylocklabs/packages</a>.
+</p>
+</body>
+</html>
