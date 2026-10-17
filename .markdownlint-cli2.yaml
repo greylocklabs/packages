@@ -1,0 +1,33 @@
+# Configuration for markdownlint-cli2
+
+# Globs to lint
+globs:
+  - "**/*.md"
+
+# Skip files git ignores, such as local notes
+gitignore: true
+
+# Globs to ignore
+ignores:
+  - node_modules/**
+  - build/**
+
+# Rule configuration
+config:
+  default: true
+
+  # Line length: 120 chars, exclude code blocks and tables
+  MD013:
+    line_length: 120
+    code_blocks: false
+    tables: false
+
+  # Allow duplicate headings if not siblings
+  MD024:
+    siblings_only: true
+
+  # Allow inline HTML, such as a logo in a README
+  MD033: false
+
+  # Don't require the first line to be a top-level heading
+  MD041: false
