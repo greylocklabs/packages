@@ -6,6 +6,7 @@ const scopes = [
   "tests",
   "ci",
   "deps",
+  "deps-dev", // Dependabot's updates to development dependencies
 ];
 
 /** @type {import('@commitlint/types').UserConfig} */
