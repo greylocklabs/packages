@@ -36,7 +36,7 @@ jobs:
           DEBIAN_FRONTEND=noninteractive apt-get install -y -qq --no-install-recommends \
             ca-certificates curl git gh gnupg rpm createrepo-c apt-utils >/dev/null
 
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
 
       - name: Compare the releases with the published ones
         id: releases
@@ -91,7 +91,7 @@ jobs:
           cp releases.txt out/
 
       - if: steps.releases.outputs.changed == 'true'
-        uses: actions/upload-pages-artifact@v3
+        uses: actions/upload-pages-artifact@v5
         with:
           path: out
 
@@ -104,4 +104,4 @@ jobs:
       url: ${{ steps.deploy.outputs.page_url }}
     steps:
       - id: deploy
-        uses: actions/deploy-pages@v4
+        uses: actions/deploy-pages@v5
