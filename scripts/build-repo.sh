@@ -117,8 +117,9 @@ if [ ${#arch[@]} -gt 0 ]; then
         for package in *.pkg.tar.zst; do
             gpg --batch --yes --local-user "$key" --detach-sign "$package"
         done
-        # --new keeps an older release, added after a newer one, from replacing it in the list.
-        repo-add --quiet --new "$name.db.tar.gz" ./*.pkg.tar.zst
+        # The files come in name order, not version order, so an older release added after a
+        # newer one must not replace it in the list.
+        repo-add --quiet --new --prevent-downgrade "$name.db.tar.gz" ./*.pkg.tar.zst
         # The site serves no symlinks, so the database is copied to the names pacman asks for.
         for list in db files; do
             rm -f "$name.$list"

@@ -110,9 +110,10 @@ if [ "$mode" = build ]; then
     fake_rpm greylock-test 1.0 "$packages"
     # An app without an Ubuntu build, whose Debian one goes in both suites.
     fake_deb debian-only-test 1.0-1 "$packages/debian-only-test_1.0-1_amd64.deb" debian
-    # Two releases, so the list must keep the newer whatever order they are added in.
-    fake_pkg greylock-test 1.0-1 "$packages"
-    fake_pkg greylock-test 0.9-1 "$packages"
+    # Two releases whose files sort the older last, so the list must keep the newer though it
+    # is added first.
+    fake_pkg greylock-test 1.10-1 "$packages"
+    fake_pkg greylock-test 1.9-1 "$packages"
 
     rm -rf "$dir"
     REPO_URL="file://$dir/greylocklabs" "$here/scripts/build-repo.sh" \
@@ -127,7 +128,7 @@ if [ "$mode" = build ]; then
         callie/deb/callie.sources callie/deb/callie-ubuntu.sources \
         greylocklabs/arch/greylocklabs.conf greylocklabs/arch/x86_64/greylocklabs.db \
         greylocklabs/arch/x86_64/greylocklabs.db.sig \
-        greylocklabs/arch/x86_64/greylock-test-1.0-1-x86_64.pkg.tar.zst.sig; do
+        greylocklabs/arch/x86_64/greylock-test-1.10-1-x86_64.pkg.tar.zst.sig; do
         [ -s "$dir/$file" ] || fail "missing $file"
     done
     grep -q '^Origin: Greylock Labs$' "$dir/greylocklabs/deb/dists/stable/Release" ||
@@ -169,7 +170,7 @@ elif [ "$mode" = pacman ]; then
     pacman-key --lsign-key "$key" >/dev/null 2>&1
     cat "$dir/greylocklabs/arch/greylocklabs.conf" >>/etc/pacman.conf
     pacman -Sy --noconfirm greylock-test >/dev/null
-    [ "$(cat /usr/share/greylock-test/arch)" = 1.0-1 ] ||
+    [ "$(cat /usr/share/greylock-test/arch)" = 1.10-1 ] ||
         fail "pacman did not install the newest release"
     echo "the pacman repository installs"
 else
