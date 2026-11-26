@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Builds a dnf and apt repository from release packages, signed with a key in
-# the current GnuPG keyring:
+# Builds a dnf, apt and pacman repository from release packages, signed with a
+# key in the current GnuPG keyring:
 #
 #   scripts/build-repo.sh <packages dir> <output dir> <key fingerprint>
 #
@@ -8,8 +8,10 @@
 # their metadata and <name>.repo; and deb/, an apt archive with Debian's
 # packages in the "stable" suite, named by <name>.sources, and Ubuntu's in the
 # "ubuntu" suite, named by <name>-ubuntu.sources: an app's <app>-ubuntu_*.deb
-# files where it has them, and its Debian ones where it does not.
-# Needs rpmsign, createrepo_c, apt-ftparchive and gpg.
+# files where it has them, and its Debian ones where it does not. When there are
+# Arch packages, arch/ holds a pacman repository of them, named in
+# arch/<name>.conf, with each package's newest version listed.
+# Needs rpmsign, createrepo_c, apt-ftparchive, gpg, and repo-add for Arch.
 #
 # Settings, from the environment:
 #   REPO_NAME    file and repository id prefix (default greylocklabs)
@@ -31,6 +33,7 @@ site="${REPO_URL:-https://packages.greylocklabs.org}"
 
 shopt -s nullglob
 rpms=("$packages"/*.rpm)
+arch=("$packages"/*.pkg.tar.zst)
 debian=()
 ubuntu=()
 for deb in "$packages"/*.deb; do
@@ -104,3 +107,31 @@ EOF
 
 suite stable main "$name.sources" "${debian[@]}"
 suite ubuntu ubuntu "$name-ubuntu.sources" "${ubuntu[@]}"
+
+# pacman checks each package and the database against a detached signature beside it.
+if [ ${#arch[@]} -gt 0 ]; then
+    mkdir -p "$out/arch/x86_64"
+    cp "${arch[@]}" "$out/arch/x86_64/"
+    (
+        cd "$out/arch/x86_64"
+        for package in *.pkg.tar.zst; do
+            gpg --batch --yes --local-user "$key" --detach-sign "$package"
+        done
+        # --new keeps an older release, added after a newer one, from replacing it in the list.
+        repo-add --quiet --new "$name.db.tar.gz" ./*.pkg.tar.zst
+        # The site serves no symlinks, so the database is copied to the names pacman asks for.
+        for list in db files; do
+            rm -f "$name.$list"
+            cp "$name.$list.tar.gz" "$name.$list"
+            for file in "$name.$list" "$name.$list.tar.gz"; do
+                gpg --batch --yes --local-user "$key" --detach-sign "$file"
+            done
+        done
+    )
+    cat >"$out/arch/$name.conf" <<EOF
+
+[$name]
+SigLevel = Required
+Server = $site/arch/\$arch
+EOF
+fi

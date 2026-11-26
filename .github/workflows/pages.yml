@@ -34,7 +34,8 @@ jobs:
         run: |
           apt-get update -qq
           DEBIAN_FRONTEND=noninteractive apt-get install -y -qq --no-install-recommends \
-            ca-certificates curl git gh gnupg rpm createrepo-c apt-utils >/dev/null
+            ca-certificates curl git gh gnupg rpm createrepo-c apt-utils pacman-package-manager \
+            makepkg libarchive-tools zstd >/dev/null
 
       - uses: actions/checkout@v7
 

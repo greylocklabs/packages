@@ -5,7 +5,8 @@
 #   scripts/fetch-packages.sh <packages dir> <app>...
 #
 # Takes the last 10 releases of greylocklabs/<app>, leaving out drafts,
-# pre-releases, source rpms and debug packages. Needs gh, signed in.
+# pre-releases, source rpms and debug packages: rpms, debs and, where a release
+# has them, Arch packages. Needs gh, signed in.
 set -euo pipefail
 
 if [ $# -lt 2 ]; then
@@ -21,7 +22,7 @@ for app in "$@"; do
         --exclude-drafts --exclude-pre-releases --json tagName -q '.[].tagName'); do
         gh release download "$tag" --repo "greylocklabs/$app" --dir "$dir" --skip-existing \
             --pattern "$app-[0-9]*.x86_64.rpm" --pattern "${app}_*_amd64.deb" \
-            --pattern "$app-ubuntu_*_amd64.deb"
+            --pattern "$app-ubuntu_*_amd64.deb" --pattern "$app-[0-9]*-x86_64.pkg.tar.zst"
         echo "$app $tag"
     done
 done

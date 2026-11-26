@@ -29,7 +29,8 @@ jobs:
         run: |
           apt-get update -qq
           DEBIAN_FRONTEND=noninteractive apt-get install -y -qq --no-install-recommends \
-            ca-certificates gnupg rpm createrepo-c apt-utils >/dev/null
+            ca-certificates gnupg rpm createrepo-c apt-utils pacman-package-manager makepkg \
+            libarchive-tools zstd >/dev/null
       - uses: actions/checkout@v7
       - run: tests/repo_test.sh build /srv/repo
       - uses: actions/upload-artifact@v7
@@ -48,3 +49,15 @@ jobs:
           name: test-repo
           path: /srv/repo
       - run: tests/repo_test.sh dnf /srv/repo
+
+  pacman:
+    needs: apt
+    runs-on: ubuntu-latest
+    container: archlinux:latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/download-artifact@v8
+        with:
+          name: test-repo
+          path: /srv/repo
+      - run: tests/repo_test.sh pacman /srv/repo

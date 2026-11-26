@@ -1,9 +1,10 @@
 #!/usr/bin/env bash
 # Checks build-repo.sh end to end with throwaway packages and a throwaway key:
 #
-#   tests/repo_test.sh build <dir>   in Debian: builds repositories into <dir>
-#                                    and installs from them with apt
-#   tests/repo_test.sh dnf <dir>     in Fedora: installs from <dir> with dnf
+#   tests/repo_test.sh build <dir>    in Debian: builds repositories into <dir>
+#                                     and installs from them with apt
+#   tests/repo_test.sh dnf <dir>      in Fedora: installs from <dir> with dnf
+#   tests/repo_test.sh pacman <dir>   in Arch: installs from <dir> with pacman
 #
 # <dir> must be the same absolute path in both, as the repository files name it.
 # Needs root, as it installs packages; meant for CI containers.
@@ -12,8 +13,8 @@ export DEBIAN_FRONTEND=noninteractive
 
 mode="${1:-}"
 dir="${2:-}"
-case "$mode" in build | dnf) ;; *)
-    echo "usage: repo_test.sh <build|dnf> <dir>" >&2
+case "$mode" in build | dnf | pacman) ;; *)
+    echo "usage: repo_test.sh <build|dnf|pacman> <dir>" >&2
     exit 2
     ;;
 esac
@@ -69,6 +70,32 @@ EOF
     cp "$top"/RPMS/x86_64/*.rpm "$out/"
 }
 
+# An Arch package of <package> at <version>, as makepkg lays one out, into <out>.
+fake_pkg() {
+    local package="$1" version="$2" out="$3" root
+    root="$(mktemp -d)"
+    mkdir -p "$root/usr/share/$package"
+    echo "$version" >"$root/usr/share/$package/arch"
+    cat >"$root/.PKGINFO" <<EOF
+pkgname = $package
+pkgbase = $package
+pkgver = $version
+pkgdesc = repository test package
+url = https://packages.greylocklabs.org
+builddate = 0
+packager = Greylock Labs <hello@greylocklabs.org>
+size = 8
+arch = x86_64
+license = MIT
+EOF
+    (
+        cd "$root"
+        LANG=C bsdtar -czf .MTREE --format=mtree \
+            --options='!all,use-set,type,uid,gid,mode,time,size,md5,sha256,link' .PKGINFO usr
+        LANG=C bsdtar --zstd -cf "$out/$package-$version-x86_64.pkg.tar.zst" .PKGINFO .MTREE usr
+    )
+}
+
 if [ "$mode" = build ]; then
     export GNUPGHOME
     GNUPGHOME="$(mktemp -d)"
@@ -83,6 +110,9 @@ if [ "$mode" = build ]; then
     fake_rpm greylock-test 1.0 "$packages"
     # An app without an Ubuntu build, whose Debian one goes in both suites.
     fake_deb debian-only-test 1.0-1 "$packages/debian-only-test_1.0-1_amd64.deb" debian
+    # Two releases, so the list must keep the newer whatever order they are added in.
+    fake_pkg greylock-test 1.0-1 "$packages"
+    fake_pkg greylock-test 0.9-1 "$packages"
 
     rm -rf "$dir"
     REPO_URL="file://$dir/greylocklabs" "$here/scripts/build-repo.sh" \
@@ -94,7 +124,10 @@ if [ "$mode" = build ]; then
         greylocklabs/rpm/repodata/repomd.xml.asc greylocklabs/deb/greylocklabs.sources \
         greylocklabs/deb/greylocklabs-ubuntu.sources greylocklabs/deb/dists/stable/InRelease \
         greylocklabs/deb/dists/ubuntu/InRelease callie/callie.asc callie/rpm/callie.repo \
-        callie/deb/callie.sources callie/deb/callie-ubuntu.sources; do
+        callie/deb/callie.sources callie/deb/callie-ubuntu.sources \
+        greylocklabs/arch/greylocklabs.conf greylocklabs/arch/x86_64/greylocklabs.db \
+        greylocklabs/arch/x86_64/greylocklabs.db.sig \
+        greylocklabs/arch/x86_64/greylock-test-1.0-1-x86_64.pkg.tar.zst.sig; do
         [ -s "$dir/$file" ] || fail "missing $file"
     done
     grep -q '^Origin: Greylock Labs$' "$dir/greylocklabs/deb/dists/stable/Release" ||
@@ -106,6 +139,8 @@ if [ "$mode" = build ]; then
         fail "InRelease is not signed"
     gpg --verify "$dir/greylocklabs/rpm/repodata/repomd.xml.asc" \
         "$dir/greylocklabs/rpm/repodata/repomd.xml" 2>/dev/null || fail "repomd.xml is not signed"
+    [ ! -L "$dir/greylocklabs/arch/x86_64/greylocklabs.db" ] ||
+        fail "the pacman database is a symlink, which the site does not serve"
 
     # Each apt suite installs its own build, checked through the signature.
     for sources in greylocklabs.sources greylocklabs-ubuntu.sources; do
@@ -126,6 +161,17 @@ if [ "$mode" = build ]; then
     done
     rm -f /etc/apt/sources.list.d/greylocklabs*.sources
     echo "the apt repositories install"
+elif [ "$mode" = pacman ]; then
+    pacman-key --init >/dev/null 2>&1
+    pacman-key --add "$dir/greylocklabs/greylocklabs.asc" >/dev/null 2>&1
+    key="$(gpg --with-colons --show-keys "$dir/greylocklabs/greylocklabs.asc" |
+        awk -F: '/^fpr/ { print $10; exit }')"
+    pacman-key --lsign-key "$key" >/dev/null 2>&1
+    cat "$dir/greylocklabs/arch/greylocklabs.conf" >>/etc/pacman.conf
+    pacman -Sy --noconfirm greylock-test >/dev/null
+    [ "$(cat /usr/share/greylock-test/arch)" = 1.0-1 ] ||
+        fail "pacman did not install the newest release"
+    echo "the pacman repository installs"
 else
     for name in greylocklabs callie; do
         cp "$dir/$name/rpm/$name.repo" /etc/yum.repos.d/
