@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Greylock Labs packages</title>
-<meta name="description" content="The signed dnf and apt repository for Greylock Labs apps on Linux.">
+<meta name="description" content="The signed dnf, apt and pacman repository for Greylock Labs apps on Linux.">
 <link rel="icon" href="logo.svg" type="image/svg+xml">
 <style>
   :root { color-scheme: light dark; --fg: #2b2027; --bg: #fdf7fa; --accent: #a64b7a; --code: #f3e6ee; }
@@ -19,7 +19,7 @@
 <body>
 <h1>Greylock Labs packages</h1>
 <p>
-  The signed dnf and apt repository for <a href="https://greylocklabs.org">Greylock Labs</a> apps on
+  The signed dnf, apt and pacman repository for <a href="https://greylocklabs.org">Greylock Labs</a> apps on
   Linux: <a href="https://callieapp.org">Callie</a> and <a href="https://jotwriter.org">Jot</a>.
   Each app's installer adds it for you, so updates come with the system's. To add it by hand:
 </p>
@@ -37,6 +37,12 @@ sudo apt update &amp;&amp; sudo apt install callie jot</code></pre>
 <pre><code>sudo curl -fsSL -o /usr/share/keyrings/greylocklabs.asc https://packages.greylocklabs.org/greylocklabs.asc
 sudo curl -fsSL -o /etc/apt/sources.list.d/greylocklabs.sources https://packages.greylocklabs.org/deb/greylocklabs-ubuntu.sources
 sudo apt update &amp;&amp; sudo apt install callie</code></pre>
+
+<h2>Arch Linux</h2>
+<pre><code>curl -fsSL https://packages.greylocklabs.org/greylocklabs.asc | sudo pacman-key --add -
+sudo pacman-key --lsign-key 09361156310986845012EA9E3E6A2C1FAFEEECEC
+curl -fsSL https://packages.greylocklabs.org/arch/greylocklabs.conf | sudo tee -a /etc/pacman.conf
+sudo pacman -Syu callie jot</code></pre>
 
 <p>
   The key's fingerprint is <code>0936 1156 3109 8684 5012 EA9E 3E6A 2C1F AFEE ECEC</code>. Packages
